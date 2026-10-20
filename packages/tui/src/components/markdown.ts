@@ -6,6 +6,11 @@ import { applyBackgroundToLine, flattenLines, visibleWidth, wrapTextWithAnsi } f
 
 const STRICT_STRIKETHROUGH_REGEX = /^(~~)(?=[^\s~])((?:\\.|[^\\])*?(?:\\.|[^\s~\\]))\1(?=[^~]|$)/;
 
+// marked's GFM autolink backpedal only recognizes ASCII punctuation. Stop bare
+// URLs at CJK/fullwidth punctuation so following prose is not part of the link.
+const CJK_PUNCTUATION_REGEX =
+	/[\u3001-\u303F\u30FB\uFE10-\uFE1F\uFE30-\uFE4F\uFF01-\uFF0F\uFF1A-\uFF20\uFF3B-\uFF40\uFF5B-\uFF65]/u;
+
 class StrictStrikethroughTokenizer extends Tokenizer {
 	override del(src: string): Tokens.Del | undefined {
 		const match = STRICT_STRIKETHROUGH_REGEX.exec(src);
@@ -20,6 +25,20 @@ class StrictStrikethroughTokenizer extends Tokenizer {
 			text,
 			tokens: this.lexer.inlineTokens(text),
 		};
+	}
+
+	override url(src: string): Tokens.Link | undefined {
+		const token = super.url(src);
+		if (!token) {
+			return undefined;
+		}
+
+		const boundary = CJK_PUNCTUATION_REGEX.exec(token.raw);
+		if (!boundary) {
+			return token;
+		}
+
+		return super.url(token.raw.slice(0, boundary.index));
 	}
 }
 

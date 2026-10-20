@@ -1690,6 +1690,31 @@ bar`,
 			);
 			assert.ok(!rawPlain.join("").includes("(https://example.com)"), "URL should not appear twice");
 		});
+
+		it("should stop bare URLs before fullwidth punctuation", () => {
+			setCapabilities({ images: null, trueColor: false, hyperlinks: true });
+
+			for (const punctuation of ["（", "，", "。", "）", "、", "：", "；", "！", "？"]) {
+				const markdown = new Markdown(
+					`PR: https://example.com/pulls/1299${punctuation}已强制更新`,
+					0,
+					0,
+					defaultMarkdownTheme,
+				);
+
+				const lines = markdown.render(80);
+				const joined = lines.join("");
+				const openedUrls = [...joined.matchAll(/\x1b\]8;;([^\x1b]+)\x1b\\/g)].map((match) => match[1]);
+				assert.deepStrictEqual(
+					openedUrls,
+					["https://example.com/pulls/1299"],
+					`URL should end before ${punctuation}`,
+				);
+
+				const plain = joined.replace(/\x1b\]8;;[^\x1b]*\x1b\\/g, "").replace(/\x1b\[[0-9;]*m/g, "");
+				assert.ok(plain.includes(`https://example.com/pulls/1299${punctuation}已强制更新`));
+			}
+		});
 	});
 
 	describe("HTML-like tags in text", () => {
